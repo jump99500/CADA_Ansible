@@ -1,0 +1,53 @@
+---
+- name: s3_bucket_connect
+  hosts: localhost
+  vars_files:
+          - variable.yaml
+  become: true
+  tasks:      
+          - name: install package
+            yum:
+                    name: 
+                        - automake 
+                        - fuse 
+                        - fuse-devel 
+                        - gcc-c++ 
+                        - git 
+                        - libcurl-devel 
+                        - libxml2-devel 
+                        - make 
+                        - openssl-devel
+                    state: latest
+          - name: Clone s3fs source code from git
+            git:
+                    repo: https://github.com/s3fs-fuse/s3fs-fuse.git
+                    dest: /home/ec2-user/s3fs-fuse
+                    clone: true
+                    force: true
+          - name: autogen
+            shell:
+                    cmd: ./autogen.sh
+                    chdir: /home/ec2-user/s3fs-fuse
+          - name: configure
+            shell:
+                    cmd: ./configure
+                    chdir: /home/ec2-user/s3fs-fuse
+          - name: Build
+            make:
+                    chdir: /home/ec2-user/s3fs-fuse
+          - name: install
+            make:
+                    chdir: /home/ec2-user/s3fs-fuse
+                    target: install
+          - name: mkdir s3bucket
+            shell: mkdir /home/ec2-user/s3bucket
+            args:
+                    executable: /bin/bash
+          - name: mount
+            shell: /usr/local/bin/s3fs {{ project_name }}-log-bucket1230 /home/ec2-user/s3bucket
+            args:
+                    executable: /bin/bash
+          - name: mkdir web_log
+            shell: sudo mkdir /home/ec2-user/s3bucket/web_log
+            args:
+                    executable: /bin/bash

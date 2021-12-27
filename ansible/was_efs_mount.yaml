@@ -1,0 +1,42 @@
+---
+- name: efs
+  hosts: localhost
+  vars_files:
+          - variable.yaml
+  tasks:
+          - efs_info:
+                    region: '{{ project_region }}'
+                    name: '{{ project_name }}-efs'
+            register: efs
+- name: was efs
+  hosts: localhost
+  become: true
+  vars_files:
+          - variable.yaml
+  vars:
+          ansible_ssh_private_key_file: ./id_rsa
+  tasks:
+          - name: install nfs
+            shell: sudo yum install nfs-utils -y
+            args:
+                    executable: /bin/bash
+          - name: mkdir efs
+            file:
+                    path: /home/ec2-user/efs
+                    state: directory
+          - name: mount efs
+            shell: sudo mount -t nfs -o nfsvers=4.1 {{ hostvars["localhost"]["efs"].efs[0].mount_point[1:] }} /home/ec2-user/efs
+            args:
+                     executable: /bin/bash
+           # mount:
+            #        path: /home/ec2-uesr/efs
+            #        src: '{{ hostvars["localhost"]["efs"].efs[0].mount_point }}'
+            #        fstype: nfs4
+            #        opts: nfsvers=4.1
+            #        state: mounted
+          - name: change owner efs
+            file:
+                    dest: /home/ec2-user/efs
+                    owner: ec2-user
+                    group: ec2-user
+                    state: directory

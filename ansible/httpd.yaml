@@ -1,0 +1,54 @@
+---
+- name: elb
+  hosts: localhost
+  vars_files:
+        - variable.yaml
+  tasks:
+          - elb_application_lb_info:
+                    region: ap-northeast-2
+                    names: cd-nlb
+            register: nlb
+- name: web
+  hosts: _cd_web
+  become: true
+  vars_files:
+          - variable.yaml
+  vars:
+          ansible_ssh_private_key_file: ./id_rsa
+  tasks:
+          - name: httpd
+            shell: sudo yum install httpd -y
+            args:
+                    executable: /bin/bash
+          - name: health check
+            shell: sudo echo 'health check'> /var/www/html/health.html
+            args:
+                    executable: /bin/bash
+
+          - name: start
+            service:
+                    name: httpd
+                    state: started
+                    enabled: true
+            ignore_errors: true
+          - name: proxy
+            blockinfile: 
+                    dest: /etc/httpd/conf/httpd.conf
+                    content: | 
+                            ProxyRequests Off
+                            ProxyPreserveHost On
+                            <Proxy *>
+                                    Order deny,allow
+                                    Allow from all
+                            </Proxy>
+                            ProxyPass /tomcat http://{{ item }}:8080/
+                            ProxyPass /redis http://{{ item }}:8080/test.jsp
+                            ProxyPass /petclinic http://{{ item }}:8080/petclinic
+                            ProxyPassReverse / http://{{ item }}:8080/
+                    insertbefore: "^</VirtualHost>$"
+            with_items: '{{ hostvars["localhost"]["nlb"].load_balancers[0].dns_name }}'
+          - name: proxy3
+            systemd:
+                    name: httpd
+                    state: restarted
+                    enabled: true

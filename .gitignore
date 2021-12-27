@@ -1,0 +1,6 @@
+.terraform/
+id_rsa
+bastion.sh
+efs_mount.sh
+s3_mount.sh
+id_rsa.pub

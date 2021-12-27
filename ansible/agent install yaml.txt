@@ -1,0 +1,19 @@
+# vim agent.yaml
+---
+- name: Agent install
+  hosts: aws_ec2
+  tasks:
+  - name: awslogs install
+    shell: yum install awslogs -y
+    args:
+            executable: /bin/bash
+  - name: awscli.conf
+    shell: sed -i 's/region = us-east-1/region = ap-northeast-2/g' /etc/awslogs/awscli.conf
+    args:
+            executable: /bin/bash
+  - name: start awslogsd
+    shell: systemctl start awslogsd
+    args:
+            executable: /bin/bash
+  - name: enable awslogsd.service
+    shell: systemctl enable awslogsd.service

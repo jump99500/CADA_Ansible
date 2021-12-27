@@ -1,0 +1,77 @@
+---
+- name: cloudwatch web_log
+  hosts: localhost
+  gather_facts: true
+  become: true
+  vars_files:
+          - variable.yaml
+  vars:
+            ansible_ssh_private_key_file: ./id_rsa
+  tasks:
+        - name: install aws agent 
+          shell: yum install -y https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm
+          args:
+                executable: /bin/bash
+        - name: asw agent stop
+          command: /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a stop
+
+        - name: enter cloudwatch config.json
+          copy:
+                dest: /opt/aws/amazon-cloudwatch-agent/bin/config.json
+                content: |
+                        {
+                            "agent": {
+                                    "metric_collection_interval": 60,
+                                    "run_as_user": "root"
+                            },
+                            "logs": {
+                                    "logs_collected": {
+                                            "files": {
+                                                    "collect_list": [
+                                                            {
+                                                                    "file_path": "/var/log/messages",
+                                                                    "log_group_name": '{{ project_name }}-log-group',
+                                                                    "log_stream_name": "WEB/{instance_id}/var/log/messages"
+                                                            },
+                                                            {
+                                                                    "file_path": "/var/log/httpd/error_log",
+                                                                    "log_group_name": '{{ project_name }}-log-group',
+                                                                    "log_stream_name": "WEB/{instance_id}/var/log/httpd/error_log"
+                                                            }
+                                                    ]
+                                            }
+                                    }
+
+                            },
+                            "metrics":{
+                                    "namespace":"WEBResource",
+                                    "append_dimensions": {
+                                                            "InstanceId": "${aws:InstanceId}",
+                                                            "InstanceType": "${aws:InstanceType}"
+                                    },
+                                    "metrics_collected":{
+                                            "cpu":{
+                                                            "measurement":[
+                                                                    "cpu_usage_user",
+                                                                    "cpu_usage_active"
+                                                            ],
+                                                            "resources": ["*"]
+                                            },
+                                            "disk":{
+                                                            "measurement":[
+                                                                    "disk_free",
+                                                                    "disk_used_percent"
+                                                            ],
+                                                            "resources": ["*"]
+                                            },
+                                            "mem":{
+                                                            "measurement":[
+                                                                    "mem_used_percent",
+                                                                    "mem_free"
+                                                            ]
+                                            }
+                                    }
+                            }
+                        }
+        - name: run
+          command: /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json

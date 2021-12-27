@@ -1,0 +1,106 @@
+resource "aws_vpc" "docker" {
+  cidr_block       = "10.1.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "docker"
+  }
+}
+
+resource "aws_eip" "neip" {
+  vpc      = true
+}
+
+resource "aws_subnet" "db-a" {
+  vpc_id     = aws_vpc.docker.id
+  availability_zone = "ap-northeast-2a"
+  cidr_block = "192.168.0.0/24"
+
+  tags = {
+    Name = "db-a1"
+  }
+}
+
+resource "aws_subnet" "db-c" {
+  vpc_id     = aws_vpc.docker.id
+  availability_zone = "ap-northeast-2c"
+  cidr_block = "192.168.0.0/24"
+
+  tags = {
+    Name = "db-c1"
+  }
+}
+
+
+
+resource "aws_route_table" "igw" {
+  vpc_id = aws_vpc.docker.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+  }
+
+  tags = {
+    Name = "igw"
+  }
+}
+
+resource "aws_route_table" "ngw" {
+  vpc_id = aws_vpc.docker.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+  }
+
+  tags = {
+    Name = "ngw"
+  }
+}
+
+resource "aws_route_table_association" "a1" {
+  subnet_id      = aws_subnet.db-a.id
+  route_table_id = aws_route_table.ngw.id
+}
+
+resource "aws_route_table_association" "a2" {
+  subnet_id      = aws_subnet.db-c.id
+  route_table_id = aws_route_table.ngw.id
+}
+
+resource "aws_security_group" "db_sg" {
+  name        = "db-sg" # 실제 sg 이름
+  description = "Allow MySQL inbound traffic"
+  vpc_id      = aws_vpc.docker.id//aws_vpc.vpc.id # sg가 vpc안에서만 사용가능
+
+  ingress = [
+    {
+      description      = "MySQL from VPC"
+      from_port        = "3306" 
+      to_port          = "3306" 
+      protocol         = "tcp"
+      cidr_blocks = []
+      ipv6_cidr_blocks = []
+      security_groups    = [aws_security_group.sg_was.id]
+      prefix_list_ids = null
+      self = null
+    }
+  ]
+
+  egress = [
+        {
+            description = ""
+            from_port = 0
+            to_port = 0
+            protocol = "-1"
+            cidr_blocks = ["0.0.0.0/0"]
+            ipv6_cidr_blocks = ["::/0"]
+            security_groups = null
+            prefix_list_ids = null
+            self = false
+        }
+    ]
+
+    tags = {
+        Name = "wafo-sg-db"
+    }
+}
